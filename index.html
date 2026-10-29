@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>庖丁解牛 - 互動解謎</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&display=swap');
+        body {
+            font-family: 'Noto Serif TC', serif;
+            background-color: #f4f1ea; /* 米黃色宣紙質感 */
+            color: #2c2c2c;
+        }
+        .ink-text {
+            background: linear-gradient(to right, #434343 0%, black 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .fade-in {
+            animation: fadeIn 1.5s ease-in-out forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        /* 隱藏的縫隙，滑鼠懸停時微微發光 */
+        .joint-spot {
+            cursor: crosshair;
+            transition: all 0.3s;
+        }
+        .joint-spot:hover {
+            fill: rgba(200, 50, 50, 0.4);
+            filter: drop-shadow(0 0 8px rgba(200, 50, 50, 0.8));
+        }
+        /* 新增的動畫與特效 */
+        .shake {
+            animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+        }
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+        .slash-target {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            background: radial-gradient(circle, rgba(255,255,255,0.9) 0%, transparent 70%);
+            border-radius: 50%;
+            cursor: crosshair;
+            opacity: 0;
+            animation: popIn 1.5s forwards;
+        }
+        @keyframes popIn {
+            0% { opacity: 0; transform: scale(0.5); }
+            20% { opacity: 1; transform: scale(1.2); }
+            80% { opacity: 1; transform: scale(1); }
+            100% { opacity: 0; transform: scale(0.1); }
+        }
+        .dark-mode {
+            background-color: #111 !important;
+            color: #eee !important;
+            transition: background-color 2s ease;
+        }
+    </style>
+</head>
+<body class="h-screen w-full flex items-center justify-center overflow-hidden">
+
+    <!-- 遊戲容器 -->
+    <div id="game-container" class="relative w-full max-w-3xl h-[600px] bg-white shadow-2xl border border-gray-300 rounded-lg overflow-hidden flex flex-col items-center justify-center p-8">
+        
+        <!-- 首頁 -->
+        <div id="screen-title" class="absolute inset-0 flex flex-col items-center justify-center bg-[#f4f1ea] z-50 fade-in">
+            <h1 class="text-5xl md:text-7xl font-bold mb-6 ink-text tracking-widest text-center">庖丁解牛</h1>
+            <p class="text-xl mb-12 text-gray-600 text-center max-w-lg leading-relaxed">
+                「臣之所好者，道也，進乎技矣。」<br>
+                尋找事物的肌理，體驗游刃有餘的境界。
+            </p>
+            <button onclick="startGame()" class="px-8 py-3 border-2 border-gray-800 text-gray-800 hover:bg-gray-800 hover:text-[#f4f1ea] transition-colors duration-300 text-lg tracking-widest rounded-md">
+                執刀始解
+            </button>
+        </div>
+
+        <!-- 第一關：始解之時 -->
+        <div id="screen-level1" class="hidden absolute inset-0 flex flex-col items-center p-8 bg-[#f4f1ea]">
+            <div class="w-full flex justify-between items-start mb-4">
+                <h2 class="text-2xl font-bold border-b-2 border-gray-800 pb-2">第一境界：始解之時</h2>
+                <span class="text-gray-500 text-sm">「始臣之解牛之時，所見無非牛者。」</span>
+            </div>
+            <p class="mb-8 text-center text-gray-700">
+                面對龐大的全牛，不知從何下手。<br>請在圖中仔細尋找可以下刀的<strong class="text-red-700">「骨節縫隙」</strong>。
+            </p>
+            
+            <!-- 抽象的牛 SVG -->
+            <div class="relative w-full max-w-md aspect-video border border-gray-400 bg-white shadow-inner flex items-center justify-center">
+                <svg viewBox="0 0 400 300" class="w-full h-full opacity-80" id="ox-svg">
+                    <!-- 牛的輪廓 (抽象幾何) -->
+                    <path d="M 50,200 Q 100,100 200,120 T 350,150 Q 370,220 320,250 T 200,280 T 50,200 Z" fill="none" stroke="#333" stroke-width="3"/>
+                    <path d="M 350,150 Q 380,100 360,80 Q 340,110 320,130" fill="none" stroke="#333" stroke-width="3"/>
+                    <circle cx="340" cy="110" r="3" fill="#333" />
+                    <!-- 裝飾線條 (迷惑玩家用) -->
+                    <path d="M 100,150 L 150,180 M 200,150 L 220,200 M 250,130 L 280,180" fill="none" stroke="#999" stroke-width="1" stroke-dasharray="4"/>
+                    
+                    <!-- 真正的縫隙 (互動點) -->
+                    <circle cx="230" cy="165" r="15" fill="transparent" class="joint-spot" onclick="passLevel1()" title="骨節縫隙"/>
+                </svg>
+            </div>
+            <div id="level1-message" class="mt-6 text-red-700 font-bold opacity-0 transition-opacity">
+                找到縫隙了！
+            </div>
+        </div>
+
+        <!-- 第二關：未嘗見全牛也 (迷宮) -->
+        <div id="screen-level2" class="hidden absolute inset-0 flex flex-col items-center p-8 bg-[#f4f1ea]">
+            <div class="w-full flex justify-between items-start mb-4">
+                <h2 class="text-2xl font-bold border-b-2 border-gray-800 pb-2">第二境界：三年之後</h2>
+                <span class="text-gray-500 text-sm">「三年之後，未嘗見全牛也。」</span>
+            </div>
+            <p class="mb-4 text-center text-gray-700">
+                眼中已無全牛，只有內部的經絡與骨骼。<br>請<strong class="text-blue-700">從綠色「起刀處」沿白色路徑滑動/拖曳至藍色「收刀處」</strong>，切勿觸碰兩側骨頭（灰色區域），以達「以無厚入有間」。
+            </p>
+            
+            <div id="maze-wrapper" class="relative w-full max-w-md aspect-video border-2 border-gray-800 bg-white shadow-inner flex items-center justify-center overflow-hidden">
+                <svg viewBox="0 0 400 300" class="w-full h-full" id="maze-svg">
+                    <!-- 骨頭 (背景/失敗區) -->
+                    <rect id="maze-bg" width="400" height="300" fill="#9ca3af" onmouseenter="failMaze()" />
+                    
+                    <!-- 經絡縫隙 (安全路徑) -->
+                    <path id="safe-path" d="M 40,150 C 120,20 180,280 260,100 S 320,250 360,150" fill="none" stroke="#f4f1ea" stroke-width="35" pointer-events="stroke" stroke-linecap="round" />
+                    
+                    <!-- 起點 -->
+                    <circle cx="40" cy="150" r="18" fill="#15803d" class="cursor-pointer" onmouseenter="startMaze()" ontouchstart="startMazeTouch(event)" />
+                    <text x="40" y="150" fill="white" font-size="12" text-anchor="middle" dominant-baseline="central" pointer-events="none">起</text>
+                    
+                    <!-- 終點 -->
+                    <circle id="maze-end" cx="360" cy="150" r="18" fill="#1d4ed8" onmouseenter="winMaze()" />
+                    <text x="360" y="150" fill="white" font-size="12" text-anchor="middle" dominant-baseline="central" pointer-events="none">收</text>
+                </svg>
+            </div>
+            <div id="level2-message" class="mt-4 text-red-700 font-bold opacity-0 transition-opacity h-6">
+                碰到骨頭了，刀刃受損！請回到「起」點重新下刀。
+            </div>
+        </div>
+
+        <!-- 第三關：以神遇而不以目視 (節奏/記憶) -->
+        <div id="screen-level3" class="hidden absolute inset-0 flex flex-col items-center justify-center p-8 bg-[#111] text-gray-200">
+             <h2 class="text-3xl font-bold mb-4 text-white">第三境界：以神遇而不以目視</h2>
+             <p class="text-lg text-gray-400 mb-8 text-center max-w-lg">
+                 「官知止而神欲行。依乎天理，批大郤，導大窾，因其固然。」<br><br>
+                 閉上雙眼，不再依賴視覺，順應自然的節奏。<br>當「神契（發光點）」短暫出現時，憑直覺迅速點擊，完成最終解剖。
+             </p>
+             <button id="btn-start-level3" onclick="startLevel3()" class="px-8 py-3 border-2 border-gray-400 text-gray-300 hover:bg-gray-200 hover:text-black transition-colors duration-300 text-lg tracking-widest rounded-md z-10">
+                 閉眼感受
+             </button>
+             
+             <!-- 點擊區域 -->
+             <div id="zen-area" class="absolute inset-0 pointer-events-none overflow-hidden"></div>
+             
+             <div id="level3-progress" class="absolute bottom-10 text-gray-400 tracking-widest hidden text-lg">
+                 解牛進度：<span id="cuts-count" class="text-white font-bold">0</span> / 5
+             </div>
+        </div>
+
+        <!-- 結局 -->
+        <div id="screen-end" class="hidden absolute inset-0 flex flex-col items-center justify-center p-8 bg-[#f4f1ea] z-50">
+             <h1 class="text-5xl font-bold mb-6 ink-text tracking-widest text-center">游刃有餘</h1>
+             <p class="text-xl mb-12 text-gray-800 text-center max-w-lg leading-relaxed font-bold">
+                 「提刀而立，為之四顧，為之躊躇滿志，善刀而藏之。」
+             </p>
+             <p class="text-md mb-12 text-gray-600 text-center max-w-lg leading-relaxed">
+                 刀刃用了十九年，解剖了數千頭牛，依然像剛在磨刀石上磨過一樣鋒利。<br>您已領悟了解牛之道，在錯綜複雜的世事中，也能尋得安身立命的縫隙。
+             </p>
+             <button onclick="location.reload()" class="px-8 py-3 border-2 border-gray-800 text-gray-800 hover:bg-gray-800 hover:text-[#f4f1ea] transition-colors duration-300 text-lg tracking-widest rounded-md">
+                 再次體驗
+             </button>
+        </div>
+
+    </div>
+
+    <script>
+        // --- 音效與全域變數 ---
+        let synth, noiseSynth;
+        
+        function initAudio() {
+            if (!synth) {
+                // Tone.js 必須在使用者首次互動後啟動
+                Tone.start();
+                synth = new Tone.Synth().toDestination();
+                noiseSynth = new Tone.NoiseSynth().toDestination();
+                noiseSynth.volume.value = -10;
+            }
+        }
+
+        function playHitBone() {
+            if(synth) synth.triggerAttackRelease("C2", "16n"); // 鈍音
+        }
+
+        function playSuccessTone() {
+            if(synth) {
+                synth.triggerAttackRelease("E5", "8n");
+                setTimeout(() => synth.triggerAttackRelease("G5", "4n"), 150); // 清脆過關音
+            }
+        }
+
+        function playSlashSound() {
+            if(noiseSynth) noiseSynth.triggerAttackRelease("32n"); // 揮刀聲
+        }
+
+        // --- 第一關邏輯 ---
+        function startGame() {
+            initAudio(); // 初始化音訊
+            document.getElementById('screen-title').classList.add('hidden');
+            let level1 = document.getElementById('screen-level1');
+            level1.classList.remove('hidden');
+            level1.classList.add('fade-in');
+        }
+
+        function passLevel1() {
+            let msg = document.getElementById('level1-message');
+            msg.style.opacity = 1;
+            msg.innerHTML = "「批大郤，導大窾」—— 成功找到縫隙！";
+            playSuccessTone();
+            
+            setTimeout(() => {
+                document.getElementById('screen-level1').classList.add('hidden');
+                let level2 = document.getElementById('screen-level2');
+                level2.classList.remove('hidden');
+                level2.classList.add('fade-in');
+                setupMazeTouch();
+            }, 2000);
+        }
+
+        // --- 第二關：迷宮邏輯 ---
+        let mazeActive = false;
+
+        function startMaze() {
+            mazeActive = true;
+            let msg = document.getElementById('level2-message');
+            msg.style.opacity = 0;
+            initAudio();
+        }
+
+        function startMazeTouch(e) {
+            e.preventDefault(); // 防止手機滾動畫面
+            startMaze();
+        }
+
+        function failMaze() {
+            if (!mazeActive) return;
+            mazeActive = false;
+            playHitBone();
+            
+            // 畫面震動與紅框特效
+            let wrapper = document.getElementById('maze-wrapper');
+            wrapper.classList.add('shake', 'border-red-600');
+            setTimeout(() => wrapper.classList.remove('shake', 'border-red-600'), 500);
+            
+            let msg = document.getElementById('level2-message');
+            msg.style.opacity = 1;
+        }
+
+        function winMaze() {
+            if (!mazeActive) return;
+            mazeActive = false;
+            playSuccessTone();
+            
+            let msg = document.getElementById('level2-message');
+            msg.style.opacity = 1;
+            msg.classList.replace('text-red-700', 'text-blue-700');
+            msg.innerHTML = "「以無厚入有間」—— 完美避開骨骼！";
+            
+            setTimeout(() => {
+                document.getElementById('screen-level2').classList.add('hidden');
+                let level3 = document.getElementById('screen-level3');
+                level3.classList.remove('hidden');
+                level3.classList.add('fade-in');
+            }, 2500);
+        }
+
+        // 支援手機觸控滑動路徑
+        function setupMazeTouch() {
+            const svg = document.getElementById('maze-svg');
+            svg.addEventListener('touchmove', (e) => {
+                if (!mazeActive) return;
+                e.preventDefault();
+                let touch = e.touches[0];
+                let elem = document.elementFromPoint(touch.clientX, touch.clientY);
+                if (elem) {
+                    if (elem.id === 'maze-bg') failMaze();
+                    else if (elem.id === 'maze-end') winMaze();
+                }
+            }, { passive: false });
+        }
+
+        // --- 第三關：神遇邏輯 ---
+        let cutsCount = 0;
+        let spawnInterval;
+
+        function startLevel3() {
+            document.getElementById('btn-start-level3').classList.add('hidden');
+            document.getElementById('level3-progress').classList.remove('hidden');
+            document.getElementById('game-container').classList.add('dark-mode');
+            initAudio();
+
+            // 每 1.2 秒產生一個節點
+            spawnInterval = setInterval(spawnTarget, 1200);
+        }
+
+        function spawnTarget() {
+            let area = document.getElementById('zen-area');
+            let target = document.createElement('div');
+            target.className = 'slash-target pointer-events-auto';
+            
+            // 避免點擊點出現在邊緣之外
+            let x = Math.random() * 80 + 10;
+            let y = Math.random() * 80 + 10;
+            target.style.left = x + '%';
+            target.style.top = y + '%';
+            
+            target.onclick = () => hitTarget(target);
+            target.ontouchstart = (e) => { e.preventDefault(); hitTarget(target); }; // 手機點擊
+            
+            area.appendChild(target);
+            
+            // 如果 1.5 秒內沒點擊則自動消失 (不扣分，純考驗反應)
+            setTimeout(() => {
+                if (target.parentNode) {
+                    target.parentNode.removeChild(target);
+                }
+            }, 1500);
+        }
+
+        function hitTarget(target) {
+            playSlashSound();
+            target.parentNode.removeChild(target);
+            cutsCount++;
+            document.getElementById('cuts-count').innerText = cutsCount;
+            
+            // 畫面稍微閃爍白光表示切擊成功
+            let container = document.getElementById('game-container');
+            container.style.backgroundColor = "#333";
+            setTimeout(() => container.style.backgroundColor = "#111", 100);
+
+            if (cutsCount >= 5) {
+                clearInterval(spawnInterval);
+                finishGame();
+            }
+        }
+
+        function finishGame() {
+            playSuccessTone();
+            setTimeout(() => {
+                document.getElementById('screen-level3').classList.add('hidden');
+                document.getElementById('game-container').classList.remove('dark-mode');
+                
+                let endScreen = document.getElementById('screen-end');
+                endScreen.classList.remove('hidden');
+                endScreen.classList.add('fade-in');
+            }, 1000);
+        }
+    </script>
+</body>
+</html>
